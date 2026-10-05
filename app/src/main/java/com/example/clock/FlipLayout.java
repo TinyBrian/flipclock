@@ -70,7 +70,7 @@ public class FlipLayout extends FrameLayout  {
         }
         float size = array.getDimension(R.styleable.FlipLayout_flipTextSize,36);
         size = px2dip(context,size);
-        int textColor = array.getColor(R.styleable.FlipLayout_flipTextColor, Color.parseColor("#2CE4D2"));
+        int textColor = array.getColor(R.styleable.FlipLayout_flipTextColor, Color.parseColor("#2AEF9B"));
 
         array.recycle();
         init(context,resId,color,size,textColor);

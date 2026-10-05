@@ -18,7 +18,7 @@
         android:paddingTop="18dp"
         android:paddingBottom="8dp"
         android:textColor="@color/sky_blue"
-        android:textSize="16sp"
+        android:textSize="20sp"
         android:textStyle="bold"
         android:text="2024年01月01日 农历正月初一 星期一" />
 
