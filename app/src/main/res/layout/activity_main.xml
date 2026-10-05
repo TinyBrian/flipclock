@@ -4,19 +4,30 @@
     android:orientation="vertical"
     android:layout_height="match_parent"
     android:layout_width="match_parent"
+    android:background="@color/black"
     xmlns:tools="http://schemas.android.com/tools"
     xmlns:myFlip="http://schemas.android.com/apk/res-auto"
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-
+    <TextView
+        android:id="@+id/date_info_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingTop="18dp"
+        android:paddingBottom="8dp"
+        android:textColor="@color/sky_blue"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:text="2024年01月01日 农历正月初一 星期一" />
 
     <LinearLayout
         android:orientation="horizontal"
         android:layout_height="match_parent"
         android:layout_width="match_parent"
         android:background="@color/black"
-        android:paddingTop="50dp"
+        android:paddingTop="10dp"
         android:paddingBottom="50dp"
         android:paddingLeft="10dp"
         android:paddingRight="10dp">

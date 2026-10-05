@@ -2,20 +2,18 @@ package com.example.clock;
 
 import android.app.Activity;
 import android.content.pm.ActivityInfo;
-import android.content.res.AssetManager;
-import android.graphics.Typeface;
 import android.os.Bundle;
-
-import android.text.TextUtils;
-import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Button;
-import android.widget.EditText;
+import android.widget.TextView;
 
-import androidx.appcompat.app.AppCompatActivity;
+import android.icu.util.ChineseCalendar;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
 import java.util.Calendar;
+import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
 /**
@@ -23,8 +21,7 @@ import java.util.TimerTask;
  */
 public class MainActivity extends Activity implements View.OnClickListener, FlipLayout.FlipOverListener {
 
-    private android.widget.EditText etInput;
-    private android.widget.Button btnSet;
+    private TextView dateInfoTextView;
     private FlipLayout bit_hour;
     private FlipLayout bit_minute;
     private FlipLayout bit_second;
@@ -36,6 +33,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
         setContentView(R.layout.activity_main);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        this.dateInfoTextView = findViewById(R.id.date_info_text);
         this.bit_second = (FlipLayout) findViewById(R.id.bit_flip_3);
         this.bit_minute = (FlipLayout) findViewById(R.id.bit_flip_2);
         this.bit_hour = (FlipLayout) findViewById(R.id.bit_flip_1);
@@ -43,16 +42,100 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
         bit_hour.flip(oldNumber.get(Calendar.HOUR_OF_DAY),24,TimeTAG.hour);
         bit_minute.flip( oldNumber.get(Calendar.MINUTE),60,TimeTAG.min);
         bit_second.flip(oldNumber.get(Calendar.SECOND),60,TimeTAG.sec);
+        updateDateInfo();
 
         new Timer().schedule(new TimerTask() {
             @Override
             public void run() {
                 start();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        updateDateInfo();
+                    }
+                });
             }
         }, 1000, 1000);//每一秒执行一次
 //        bit_hour.addFlipOverListener(this);
 //        bit_minute.addFlipOverListener(this);
 //        bit_second.addFlipOverListener(this);
+    }
+
+    private void updateDateInfo() {
+        LocalDate today = LocalDate.now();
+        String dateText = today.format(DateTimeFormatter.ofPattern("yyyy年MM月dd日", Locale.CHINA));
+
+        java.util.Calendar utilCalendar = java.util.Calendar.getInstance(Locale.CHINA);
+        utilCalendar.setTimeInMillis(System.currentTimeMillis());
+        ChineseCalendar chineseCalendar = new ChineseCalendar(Locale.CHINA);
+        chineseCalendar.setTimeInMillis(utilCalendar.getTimeInMillis());
+
+        int lunarMonth = chineseCalendar.get(ChineseCalendar.MONTH) + 1;
+        int lunarDay = chineseCalendar.get(ChineseCalendar.DAY_OF_MONTH);
+        boolean isLeapMonth = chineseCalendar.get(ChineseCalendar.IS_LEAP_MONTH) == 1;
+        String lunarText = "农历" + formatLunarMonth(lunarMonth, isLeapMonth) + formatLunarDay(lunarDay);
+
+        String weekText = today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.CHINA);
+        dateInfoTextView.setText(dateText + " " + lunarText + " " + weekText);
+    }
+
+    private String formatLunarMonth(int month, boolean isLeapMonth) {
+        String[] months = {"正", "二", "三", "四", "五", "六", "七", "八", "九", "十", "冬", "腊"};
+        String monthText = months[Math.max(0, Math.min(month - 1, months.length - 1))];
+        if (isLeapMonth) {
+            return "闰" + monthText + "月";
+        }
+        return monthText + "月";
+    }
+
+    private String formatLunarDay(int day) {
+        if (day == 1) {
+            return "初一";
+        }
+        if (day == 10) {
+            return "初十";
+        }
+        if (day == 15) {
+            return "十五";
+        }
+        if (day <= 9) {
+            return "初" + getLunarDigit(day);
+        }
+        if (day <= 19) {
+            return "十" + getLunarDigit(day - 10);
+        }
+        if (day == 20) {
+            return "二十";
+        }
+        if (day <= 29) {
+            return "廿" + getLunarDigit(day - 20);
+        }
+        return "三十";
+    }
+
+    private String getLunarDigit(int value) {
+        switch (value) {
+            case 1:
+                return "一";
+            case 2:
+                return "二";
+            case 3:
+                return "三";
+            case 4:
+                return "四";
+            case 5:
+                return "五";
+            case 6:
+                return "六";
+            case 7:
+                return "七";
+            case 8:
+                return "八";
+            case 9:
+                return "九";
+            default:
+                return String.valueOf(value);
+        }
     }
 
 
