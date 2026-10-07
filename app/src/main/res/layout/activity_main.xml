@@ -38,7 +38,7 @@
 
             <com.example.clock.BatteryIconView
                 android:id="@+id/battery_icon"
-                android:layout_width="30dp"
+                android:layout_width="48dp"
                 android:layout_height="18dp" />
 
             <TextView

@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
+import android.os.BatteryManager;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowManager;
@@ -91,6 +92,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
 
         int percentage = Math.max(0, Math.min(100, (level * 100 + scale / 2) / scale));
         batteryIconView.setBatteryLevel(percentage);
+        int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN);
+        batteryIconView.setCharging(status == BatteryManager.BATTERY_STATUS_CHARGING);
         batteryPercentageTextView.setText(percentage + "%");
         int color = getResources().getColor(
                 percentage < 20 ? R.color.battery_low : R.color.sky_blue);
