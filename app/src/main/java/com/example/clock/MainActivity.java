@@ -1,6 +1,9 @@
 package com.example.clock;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.view.View;
@@ -25,6 +28,15 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
     private FlipLayout bit_hour;
     private FlipLayout bit_minute;
     private FlipLayout bit_second;
+    private BatteryIconView batteryIconView;
+    private TextView batteryPercentageTextView;
+    private boolean batteryReceiverRegistered;
+    private final BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(android.content.Context context, Intent intent) {
+            updateBatteryLevel(intent);
+        }
+    };
     private Calendar oldNumber = Calendar.getInstance();
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,11 +50,17 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
         this.bit_second = (FlipLayout) findViewById(R.id.bit_flip_3);
         this.bit_minute = (FlipLayout) findViewById(R.id.bit_flip_2);
         this.bit_hour = (FlipLayout) findViewById(R.id.bit_flip_1);
+        batteryIconView = findViewById(R.id.battery_icon);
+        batteryPercentageTextView = findViewById(R.id.battery_percentage);
 
         bit_hour.flip(oldNumber.get(Calendar.HOUR_OF_DAY),24,TimeTAG.hour);
         bit_minute.flip( oldNumber.get(Calendar.MINUTE),60,TimeTAG.min);
         bit_second.flip(oldNumber.get(Calendar.SECOND),60,TimeTAG.sec);
         updateDateInfo();
+
+        IntentFilter batteryFilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        updateBatteryLevel(registerReceiver(batteryReceiver, batteryFilter));
+        batteryReceiverRegistered = true;
 
         new Timer().schedule(new TimerTask() {
             @Override
@@ -59,6 +77,24 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
 //        bit_hour.addFlipOverListener(this);
 //        bit_minute.addFlipOverListener(this);
 //        bit_second.addFlipOverListener(this);
+    }
+
+    private void updateBatteryLevel(Intent batteryStatus) {
+        if (batteryStatus == null) {
+            return;
+        }
+        int level = batteryStatus.getIntExtra("level", -1);
+        int scale = batteryStatus.getIntExtra("scale", -1);
+        if (level < 0 || scale <= 0) {
+            return;
+        }
+
+        int percentage = Math.max(0, Math.min(100, (level * 100 + scale / 2) / scale));
+        batteryIconView.setBatteryLevel(percentage);
+        batteryPercentageTextView.setText(percentage + "%");
+        int color = getResources().getColor(
+                percentage < 20 ? R.color.battery_low : R.color.sky_blue);
+        batteryPercentageTextView.setTextColor(color);
     }
 
     private void updateDateInfo() {
@@ -153,6 +189,16 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
 //            flipLayout.smoothFlip(1, true);
 //        }
     }
+
+    @Override
+    protected void onDestroy() {
+        if (batteryReceiverRegistered) {
+            unregisterReceiver(batteryReceiver);
+            batteryReceiverRegistered = false;
+        }
+        super.onDestroy();
+    }
+
     public void  start(){
         Calendar now = Calendar.getInstance();
         int nhour = now.get(Calendar.HOUR_OF_DAY);

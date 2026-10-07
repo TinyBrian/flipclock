@@ -11,6 +11,7 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="sky_blue">#2AEF9B</color>
+    <color name="battery_low">#FFFF3B30</color>
     <color name="DarkSlateGray">#2F4F4F</color>
     <color name="DimGray">#313131</color>
 </resources>
