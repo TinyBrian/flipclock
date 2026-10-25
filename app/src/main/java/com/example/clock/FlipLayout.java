@@ -11,6 +11,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.util.AttributeSet;
+import android.util.TypedValue;
 import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.View;
@@ -35,6 +36,9 @@ public class FlipLayout extends FrameLayout  {
 
     private int layoutWidth;
     private int layoutHeight;
+    private float maxTextSizePx;
+    private float textWidthFill = 0.94f;
+    private float textHeightFill = 0.94f;
     private Scroller mScroller;
     private String timetag;//根据时间标记获取时间
     private Camera mCamera = new Camera();
@@ -66,21 +70,29 @@ public class FlipLayout extends FrameLayout  {
         if(-1 == resId){
             color = array.getColor(R.styleable.FlipLayout_flipTextBackground, Color.WHITE);
         }
-        float size = array.getDimension(R.styleable.FlipLayout_flipTextSize,36);
-        size = px2dip(context,size);
+        float defaultTextSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 36,
+                context.getResources().getDisplayMetrics());
+        float size = array.getDimension(R.styleable.FlipLayout_flipTextSize, defaultTextSize);
         int textColor = array.getColor(R.styleable.FlipLayout_flipTextColor, Color.parseColor("#2AEF9B"));
+        textWidthFill = array.getFloat(R.styleable.FlipLayout_flipTextWidthFill, textWidthFill);
+        textHeightFill = array.getFloat(R.styleable.FlipLayout_flipTextHeightFill, textHeightFill);
+        validateFillRatio(textWidthFill);
+        validateFillRatio(textHeightFill);
 
         array.recycle();
         init(context,resId,color,size,textColor);
     }
 
     private void init(Context context, int resId, int color, float size, int textColor) {
+        maxTextSizePx = size;
         mScroller = new Scroller(context,new DecelerateInterpolator());//减速 动画插入器
         Typeface tf = Typeface.createFromAsset(context.getAssets(), "fonts/Aura.otf");
         mInvisibleTextView = new TextView(context);
-        mInvisibleTextView.setTextSize(size);
+        mInvisibleTextView.setTextSize(TypedValue.COMPLEX_UNIT_PX, size);
         mInvisibleTextView.setText("00");
         mInvisibleTextView.setGravity(Gravity.CENTER);
+        mInvisibleTextView.setSingleLine(true);
+        mInvisibleTextView.setEllipsize(null);
         mInvisibleTextView.setIncludeFontPadding(false);
         mInvisibleTextView.setTextColor(textColor);
         mInvisibleTextView.setTypeface(tf);
@@ -92,9 +104,11 @@ public class FlipLayout extends FrameLayout  {
         addView(mInvisibleTextView);
 
         mVisibleTextView = new TextView(context);
-        mVisibleTextView.setTextSize(size);
+        mVisibleTextView.setTextSize(TypedValue.COMPLEX_UNIT_PX, size);
         mVisibleTextView.setText("00");
         mVisibleTextView.setGravity(Gravity.CENTER);
+        mVisibleTextView.setSingleLine(true);
+        mVisibleTextView.setEllipsize(null);
         mVisibleTextView.setIncludeFontPadding(false);
         mVisibleTextView.setTextColor(textColor);
         mVisibleTextView.setTypeface(tf);
@@ -139,7 +153,7 @@ public class FlipLayout extends FrameLayout  {
             View child = getChildAt(i);
             child.layout(0,0,layoutWidth, layoutHeight);
         }
-
+        fitTextToBounds();
         mTopRect.top = 0;
         mTopRect.left = 0;
         mTopRect.right = getWidth();
@@ -149,6 +163,45 @@ public class FlipLayout extends FrameLayout  {
         mBottomRect.left = 0;
         mBottomRect.right = getWidth();
         mBottomRect.bottom = getHeight();
+    }
+
+    private void fitTextToBounds() {
+        fitTextView(mVisibleTextView);
+        fitTextView(mInvisibleTextView);
+    }
+
+    private void fitTextView(TextView textView) {
+        float availableWidth = (textView.getWidth() - textView.getPaddingLeft() - textView.getPaddingRight())
+                * textWidthFill;
+        float availableHeight = (textView.getHeight() - textView.getPaddingTop() - textView.getPaddingBottom())
+                * textHeightFill;
+        if (availableWidth <= 0 || availableHeight <= 0 || maxTextSizePx <= 0) {
+            return;
+        }
+
+        Paint textPaint = new Paint(textView.getPaint());
+        textPaint.setTextScaleX(1f);
+        textPaint.setTextSize(maxTextSizePx);
+        Paint.FontMetrics fontMetrics = textPaint.getFontMetrics();
+        float lineHeight = fontMetrics.descent - fontMetrics.ascent;
+        if (lineHeight <= 0) {
+            return;
+        }
+
+        float fittedTextSize = maxTextSizePx * Math.min(1f, availableHeight / lineHeight);
+        textPaint.setTextSize(fittedTextSize);
+        float textWidth = textPaint.measureText("88");
+        if (textWidth <= 0) {
+            return;
+        }
+
+        float textScaleX = availableWidth / textWidth;
+        if (Math.abs(textView.getTextSize() - fittedTextSize) > 0.5f) {
+            textView.setTextSize(TypedValue.COMPLEX_UNIT_PX, fittedTextSize);
+        }
+        if (Math.abs(textView.getTextScaleX() - textScaleX) > 0.01f) {
+            textView.setTextScaleX(textScaleX);
+        }
     }
 
     @Override
@@ -333,6 +386,20 @@ public class FlipLayout extends FrameLayout  {
         return animDuration;
     }
 
+    public void setTextFillRatios(float widthFill, float heightFill) {
+        validateFillRatio(widthFill);
+        validateFillRatio(heightFill);
+        textWidthFill = widthFill;
+        textHeightFill = heightFill;
+        fitTextToBounds();
+    }
+
+    private static void validateFillRatio(float ratio) {
+        if (ratio <= 0f || ratio > 1f || Float.isNaN(ratio) || Float.isInfinite(ratio)) {
+            throw new IllegalArgumentException("Text fill ratio must be greater than 0 and at most 1");
+        }
+    }
+
     public static interface FlipOverListener{
         /**
          * 翻页完成回调
@@ -422,13 +489,9 @@ public class FlipLayout extends FrameLayout  {
     }
 
     public void setFLipTextSize(float size){
-        int count = getChildCount();
-        for(int i=0; i<count; i++){
-            TextView child = (TextView) getChildAt(i);
-            if(null != child){
-                child.setTextSize(size);
-            }
-        }
+        maxTextSizePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, size,
+                getResources().getDisplayMetrics());
+        fitTextToBounds();
     }
 
     public void setFLipTextColor(int color){

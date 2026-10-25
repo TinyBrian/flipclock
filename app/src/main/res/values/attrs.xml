@@ -5,6 +5,8 @@
         <attr name="flipTextBackground" format="color|reference"/>
         <attr name="flipTextSize" format="dimension"/>
         <attr name="flipTextColor" format="color"/>
+        <attr name="flipTextWidthFill" format="float"/>
+        <attr name="flipTextHeightFill" format="float"/>
     </declare-styleable>
 
 </resources>

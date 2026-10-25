@@ -83,11 +83,12 @@
 
     <LinearLayout
         android:orientation="horizontal"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
         android:layout_width="match_parent"
+        android:layout_weight="1"
         android:background="@color/black"
         android:paddingTop="10dp"
-        android:paddingBottom="50dp"
+        android:paddingBottom="10dp"
         android:paddingLeft="10dp"
         android:paddingRight="10dp">
         <androidx.cardview.widget.CardView
@@ -98,8 +99,8 @@
 
             >
             <FrameLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content">
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
 
                 <com.example.clock.FlipLayout
                     android:id="@+id/bit_flip_1"
@@ -108,8 +109,10 @@
                     android:background="#ffffff"
                     myFlip:flipTextBackground="@color/DimGray"
                     myFlip:flipTextColor="@color/sky_blue"
+                    myFlip:flipTextWidthFill="0.94"
+                    myFlip:flipTextHeightFill="1"
 
-                    myFlip:flipTextSize="220sp" />
+                    myFlip:flipTextSize="500sp" />
             <!-- 底部View上面的一条线 -->
                 <View
                     android:layout_width="match_parent"
@@ -126,15 +129,17 @@
             app:cardCornerRadius="20dp"
             android:layout_marginLeft="10dp">
             <FrameLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content">
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
             <com.example.clock.FlipLayout
 
                 android:layout_height="match_parent"
                 android:layout_width="match_parent"
                 android:id="@+id/bit_flip_2"
                 myFlip:flipTextColor="@color/sky_blue"
-                myFlip:flipTextSize="220sp"
+                myFlip:flipTextWidthFill="0.94"
+                myFlip:flipTextHeightFill="1"
+                myFlip:flipTextSize="500sp"
                 myFlip:flipTextBackground="@color/DimGray"
                 android:background="#ffffff"/>
                 <!-- 底部View上面的一条线 -->
@@ -154,16 +159,18 @@
             app:cardCornerRadius="20dp"
             android:layout_marginLeft="10dp">
             <FrameLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content">
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
             <com.example.clock.FlipLayout
                 android:layout_height="match_parent"
                 android:layout_width="match_parent"
                 android:id="@+id/bit_flip_3"
                 myFlip:flipTextColor="@color/sky_blue"
-                myFlip:flipTextSize="220sp"
+                myFlip:flipTextWidthFill="0.94"
+                myFlip:flipTextHeightFill="1"
+                myFlip:flipTextSize="500sp"
                 myFlip:flipTextBackground="@color/DimGray"
-                android:background="#333"/>  />
+                android:background="#333"/>
             <!-- 底部View上面的一条线 -->
             <View
                 android:layout_width="match_parent"
