@@ -109,7 +109,7 @@
                     myFlip:flipTextBackground="@color/DimGray"
                     myFlip:flipTextColor="@color/sky_blue"
 
-                    myFlip:flipTextSize="200sp" />
+                    myFlip:flipTextSize="220sp" />
             <!-- 底部View上面的一条线 -->
                 <View
                     android:layout_width="match_parent"
@@ -134,7 +134,7 @@
                 android:layout_width="match_parent"
                 android:id="@+id/bit_flip_2"
                 myFlip:flipTextColor="@color/sky_blue"
-                myFlip:flipTextSize="200sp"
+                myFlip:flipTextSize="220sp"
                 myFlip:flipTextBackground="@color/DimGray"
                 android:background="#ffffff"/>
                 <!-- 底部View上面的一条线 -->
@@ -161,7 +161,7 @@
                 android:layout_width="match_parent"
                 android:id="@+id/bit_flip_3"
                 myFlip:flipTextColor="@color/sky_blue"
-                myFlip:flipTextSize="200sp"
+                myFlip:flipTextSize="220sp"
                 myFlip:flipTextBackground="@color/DimGray"
                 android:background="#333"/>  />
             <!-- 底部View上面的一条线 -->
