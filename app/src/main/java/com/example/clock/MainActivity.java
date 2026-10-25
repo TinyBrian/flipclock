@@ -307,8 +307,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
                 WeatherData weather = loadWeather(location);
                 runOnUiThread(() -> {
                     if (requestId == weatherRequestId && !isFinishing()) {
-                        weatherIconView.setWeatherCode(weather.weatherCode);
-                        weatherIconView.setContentDescription(describeWeather(weather.weatherCode));
+                        weatherIconView.setWeatherCode(weather.weatherCode, weather.isDay);
+                        weatherIconView.setContentDescription(describeWeather(weather.weatherCode, weather.isDay));
                         weatherInfoTextView.setTextColor(weatherIconView.getTemperatureColor());
                         weatherInfoTextView.setText(String.format(Locale.CHINA,
                                 "%.0f°C", weather.temperature));
@@ -327,7 +327,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
 
     private WeatherData loadWeather(Location location) throws IOException, JSONException {
         String address = String.format(Locale.US,
-                "https://api.open-meteo.com/v1/forecast?latitude=%.5f&longitude=%.5f&current=temperature_2m,weather_code&timezone=auto",
+                "https://api.open-meteo.com/v1/forecast?latitude=%.5f&longitude=%.5f&current=temperature_2m,weather_code,is_day&timezone=auto",
                 location.getLatitude(), location.getLongitude());
         HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
         connection.setConnectTimeout(10000);
@@ -346,54 +346,59 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
                     response.append(line);
                 }
                 JSONObject current = new JSONObject(response.toString()).getJSONObject("current");
-                return new WeatherData(current.getDouble("temperature_2m"), current.getInt("weather_code"));
+                return new WeatherData(current.getDouble("temperature_2m"), current.getInt("weather_code"),
+                        current.getInt("is_day") == 1);
             }
         } finally {
             connection.disconnect();
         }
     }
 
-    private String describeWeather(int weatherCode) {
+    private String describeWeather(int weatherCode, boolean isDay) {
+        String description;
         switch (weatherCode) {
-            case 0: return "晴朗";
-            case 1: return "少云";
-            case 2: return "多云";
-            case 3: return "阴";
+            case 0: description = "晴朗"; break;
+            case 1: description = "少云"; break;
+            case 2: description = "多云"; break;
+            case 3: description = "阴"; break;
             case 45:
-            case 48: return "雾";
+            case 48: description = "雾"; break;
             case 51:
             case 56:
             case 61:
-            case 80: return "小雨";
+            case 80: description = "小雨"; break;
             case 53:
             case 57:
             case 63:
-            case 81: return "中雨";
+            case 81: description = "中雨"; break;
             case 55:
             case 65:
             case 82:
-            case 67: return "大雨";
-            case 66: return "小雨";
+            case 67: description = "大雨"; break;
+            case 66: description = "小雨"; break;
             case 71:
             case 73:
             case 75:
             case 77:
             case 85:
-            case 86: return "降雪";
+            case 86: description = "降雪"; break;
             case 95:
             case 96:
-            case 99: return "雷雨";
-            default: return "天气";
+            case 99: description = "雷雨"; break;
+            default: description = "天气"; break;
         }
+        return isDay ? description : "夜间" + description;
     }
 
     private static class WeatherData {
         final double temperature;
         final int weatherCode;
+        final boolean isDay;
 
-        WeatherData(double temperature, int weatherCode) {
+        WeatherData(double temperature, int weatherCode, boolean isDay) {
             this.temperature = temperature;
             this.weatherCode = weatherCode;
+            this.isDay = isDay;
         }
     }
 

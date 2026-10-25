@@ -12,13 +12,19 @@ public class WeatherIconView extends View {
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private int weatherCode = -1;
+    private boolean isDay = true;
 
     public WeatherIconView(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
 
     public void setWeatherCode(int weatherCode) {
+        setWeatherCode(weatherCode, true);
+    }
+
+    public void setWeatherCode(int weatherCode, boolean isDay) {
         this.weatherCode = weatherCode;
+        this.isDay = isDay;
         invalidate();
     }
 
@@ -50,9 +56,17 @@ public class WeatherIconView extends View {
         if (weatherCode < 0) {
             drawCloud(canvas);
         } else if (weatherCode == 0) {
-            drawSun(canvas, 20, 19, 8);
+            if (isDay) {
+                drawSun(canvas, 20, 19, 8);
+            } else {
+                drawMoon(canvas, 20, 19, 8);
+            }
         } else if (weatherCode == 1 || weatherCode == 2) {
-            drawSun(canvas, 14, 14, 6);
+            if (isDay) {
+                drawSun(canvas, 14, 14, 6);
+            } else {
+                drawMoon(canvas, 14, 14, 6);
+            }
             drawCloud(canvas);
         } else if (weatherCode == 3) {
             drawCloud(canvas);
@@ -75,6 +89,15 @@ public class WeatherIconView extends View {
     }
 
     private int backgroundColor() {
+        if (!isDay) {
+            if (weatherCode == 0) return 0xFF142850;
+            if (weatherCode == 1 || weatherCode == 2) return 0xFF1B3558;
+            if (weatherCode == 3 || weatherCode == 45 || weatherCode == 48) return 0xFF253858;
+            if (isDrizzleOrRain()) return 0xFF163A63;
+            if (isSnow()) return 0xFF1C4268;
+            if (isThunderstorm()) return 0xFF24254B;
+            return 0xFF20334F;
+        }
         if (weatherCode == 0) return 0xFFFFA726;
         if (weatherCode == 1 || weatherCode == 2) return 0xFF42A5F5;
         if (weatherCode == 3) return 0xFF607D8B;
@@ -124,8 +147,17 @@ public class WeatherIconView extends View {
         canvas.drawCircle(centerX, centerY, radius, paint);
     }
 
+    private void drawMoon(Canvas canvas, float centerX, float centerY, float radius) {
+        paint.setColor(0xFFFFF1B8);
+        canvas.drawCircle(centerX, centerY, radius, paint);
+        paint.setColor(backgroundColor());
+        canvas.drawCircle(centerX + radius * 0.48f, centerY - radius * 0.42f, radius * 0.86f, paint);
+        paint.setColor(0xFFFFF1B8);
+        canvas.drawCircle(centerX - radius * 0.5f, centerY + radius * 0.5f, radius * 0.12f, paint);
+    }
+
     private void drawCloud(Canvas canvas) {
-        paint.setColor(0xFFF5F9FF);
+        paint.setColor(isDay ? 0xFFF5F9FF : 0xFFD7E6F5);
         canvas.drawCircle(13, 23, 6, paint);
         canvas.drawCircle(20, 19, 8, paint);
         canvas.drawCircle(28, 23, 6, paint);
