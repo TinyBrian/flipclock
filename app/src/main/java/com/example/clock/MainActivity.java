@@ -16,6 +16,8 @@ import android.os.BatteryManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
@@ -59,6 +61,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
     private View weatherStatusView;
     private LocationManager locationManager;
     private LocationListener locationListener;
+    private TextToSpeech textToSpeech;
+    private boolean textToSpeechReady;
+    private boolean activityResumed;
+    private int pendingAnnouncementHour = -1;
     private final ExecutorService weatherExecutor = Executors.newSingleThreadExecutor();
     private final Runnable locationTimeout = () -> {
         if (locationListener != null) {
@@ -112,6 +118,46 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
         weatherStatusView.setOnClickListener(v ->
                 startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://open-meteo.com/"))));
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        textToSpeech = new TextToSpeech(this, status -> {
+            if (status != TextToSpeech.SUCCESS) {
+                Log.e(TAG, "Unable to initialize the default text-to-speech engine: " + status);
+                return;
+            }
+            if (textToSpeech == null) {
+                return;
+            }
+
+            int languageStatus = textToSpeech.setLanguage(Locale.SIMPLIFIED_CHINESE);
+            if (languageStatus == TextToSpeech.LANG_MISSING_DATA
+                    || languageStatus == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Log.e(TAG, "Chinese text-to-speech language is unavailable: " + languageStatus);
+                return;
+            }
+
+            textToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override
+                public void onStart(String utteranceId) {
+                    Log.d(TAG, "Hourly announcement started");
+                }
+
+                @Override
+                public void onDone(String utteranceId) {
+                    Log.d(TAG, "Hourly announcement completed");
+                }
+
+                @Override
+                public void onError(String utteranceId) {
+                    Log.e(TAG, "Hourly announcement failed");
+                }
+            });
+            textToSpeechReady = true;
+            Log.i(TAG, "Default TTS engine ready: " + textToSpeech.getDefaultEngine());
+            if (activityResumed && pendingAnnouncementHour >= 0) {
+                int hour = pendingAnnouncementHour;
+                pendingAnnouncementHour = -1;
+                announceHour(hour);
+            }
+        });
 
         oldNumber = Calendar.getInstance();
         bit_hour.flip(oldNumber.get(Calendar.HOUR_OF_DAY),24,TimeTAG.hour);
@@ -131,6 +177,12 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
     @Override
     protected void onResume() {
         super.onResume();
+        activityResumed = true;
+        pendingAnnouncementHour = -1;
+        oldNumber = Calendar.getInstance();
+        bit_hour.flip(oldNumber.get(Calendar.HOUR_OF_DAY), 24, TimeTAG.hour);
+        bit_minute.flip(oldNumber.get(Calendar.MINUTE), 60, TimeTAG.min);
+        bit_second.flip(oldNumber.get(Calendar.SECOND), 60, TimeTAG.sec);
         start();
         updateDateInfo();
         scheduleNextClockTick();
@@ -140,6 +192,11 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
 
     @Override
     protected void onPause() {
+        activityResumed = false;
+        pendingAnnouncementHour = -1;
+        if (textToSpeech != null) {
+            textToSpeech.stop();
+        }
         clockHandler.removeCallbacks(clockTick);
         clockHandler.removeCallbacks(weatherRefresh);
         stopLocationUpdates();
@@ -464,6 +521,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
         weatherRequestId++;
         stopLocationUpdates();
         weatherExecutor.shutdownNow();
+        if (textToSpeech != null) {
+            textToSpeech.shutdown();
+            textToSpeech = null;
+        }
         if (batteryReceiverRegistered) {
             unregisterReceiver(batteryReceiver);
             batteryReceiverRegistered = false;
@@ -485,7 +546,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
 
         if (nhour != ohour) {
             bit_hour.smoothFlip(1, 24,TimeTAG.hour,false);
-
+            announceHour(nhour);
         }
 
         if (nminute != ominute) {
@@ -499,5 +560,22 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
 
 
 
+    }
+
+    private void announceHour(int hour) {
+        if (!activityResumed) {
+            return;
+        }
+        if (!textToSpeechReady) {
+            pendingAnnouncementHour = hour;
+            return;
+        }
+
+        String announcement = String.format(Locale.SIMPLIFIED_CHINESE, "现在是%d点整", hour);
+        int result = textToSpeech.speak(announcement, TextToSpeech.QUEUE_FLUSH, null,
+                "hour-" + System.currentTimeMillis());
+        if (result == TextToSpeech.ERROR) {
+            Log.e(TAG, "Unable to speak hourly announcement");
+        }
     }
 }
