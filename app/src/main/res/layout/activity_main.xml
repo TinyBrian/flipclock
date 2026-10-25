@@ -183,4 +183,16 @@
 
 </LinearLayout>
 
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:background="@color/black">
+
+        <com.example.clock.DayProgressView
+            android:id="@+id/day_progress"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="今日时间进度" />
+    </FrameLayout>
+
 </LinearLayout>

@@ -58,6 +58,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
     private TextView batteryPercentageTextView;
     private WeatherIconView weatherIconView;
     private TextView weatherInfoTextView;
+    private DayProgressView dayProgressView;
     private View weatherStatusView;
     private LocationManager locationManager;
     private LocationListener locationListener;
@@ -90,6 +91,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
             scheduleNextClockTick();
         }
     };
+    private final Runnable dayProgressTick = new Runnable() {
+        @Override
+        public void run() {
+            updateDayProgress();
+            clockHandler.postDelayed(this, 30 * 1000L);
+        }
+    };
     private final BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(android.content.Context context, Intent intent) {
@@ -113,6 +121,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
         batteryPercentageTextView = findViewById(R.id.battery_percentage);
         weatherIconView = findViewById(R.id.weather_icon);
         weatherInfoTextView = findViewById(R.id.weather_info);
+        dayProgressView = findViewById(R.id.day_progress);
         weatherStatusView = findViewById(R.id.weather_status);
         weatherStatusView.setContentDescription("天气数据来源 Open-Meteo");
         weatherStatusView.setOnClickListener(v ->
@@ -185,6 +194,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
         bit_second.flip(oldNumber.get(Calendar.SECOND), 60, TimeTAG.sec);
         start();
         updateDateInfo();
+        updateDayProgress();
+        clockHandler.removeCallbacks(dayProgressTick);
+        clockHandler.postDelayed(dayProgressTick, 30 * 1000L);
         scheduleNextClockTick();
         requestWeatherLocation();
         scheduleWeatherRefresh();
@@ -198,6 +210,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
             textToSpeech.stop();
         }
         clockHandler.removeCallbacks(clockTick);
+        clockHandler.removeCallbacks(dayProgressTick);
         clockHandler.removeCallbacks(weatherRefresh);
         stopLocationUpdates();
         super.onPause();
@@ -206,6 +219,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
     private void scheduleWeatherRefresh() {
         clockHandler.removeCallbacks(weatherRefresh);
         clockHandler.postDelayed(weatherRefresh, WEATHER_REFRESH_INTERVAL);
+    }
+
+    private void updateDayProgress() {
+        Calendar now = Calendar.getInstance();
+        long elapsedToday = (((now.get(Calendar.HOUR_OF_DAY) * 60L + now.get(Calendar.MINUTE)) * 60L
+                + now.get(Calendar.SECOND)) * 1000L) + now.get(Calendar.MILLISECOND);
+        dayProgressView.setProgress(elapsedToday / (24f * 60 * 60 * 1000));
     }
 
     private void requestWeatherLocation() {
