@@ -96,10 +96,11 @@ public class DayProgressView extends View {
 
     private void drawSunMarker(Canvas canvas, float x, float trackY, float density, boolean sunrise) {
         float radius = 10 * density;
-        float centerY = sunrise ? trackY : trackY - 12 * density;
+        float centerY = sunrise ? trackY - 2 * density : trackY - 12 * density;
 
         if (sunrise) {
             drawSunriseIcon(canvas, x, centerY, radius, density);
+            drawSleepingRabbit(canvas, x + radius + 14 * density, trackY, density);
         } else {
             drawSunsetIcon(canvas, x, centerY, radius, density);
         }
@@ -131,12 +132,47 @@ public class DayProgressView extends View {
         canvas.drawCircle(x, centerY, radius, paint);
         canvas.restore();
         paint.setShader(null);
+    }
 
-        paint.setColor(0xFFFFD54F);
+    private void drawSleepingRabbit(Canvas canvas, float left, float trackY, float density) {
+        canvas.save();
+        canvas.translate(left, trackY);
+        canvas.save();
+        float headCenterX = 31 * density;
+        float headCenterY = -8 * density;
+        canvas.scale(1.7f, 1.7f, headCenterX, headCenterY);
+
+        paint.setColor(0xFFFFEBD8);
+        canvas.drawCircle(31 * density, -8 * density, 5.5f * density, paint);
+        canvas.drawOval(new RectF(28 * density, -20 * density, 31.5f * density, -10 * density), paint);
+        canvas.drawOval(new RectF(32 * density, -19 * density, 35.5f * density, -10 * density), paint);
+
+        paint.setColor(0xFFFFC5D2);
+        canvas.drawOval(new RectF(29 * density, -19 * density, 30.5f * density, -11 * density), paint);
+        canvas.drawOval(new RectF(33 * density, -18 * density, 34.5f * density, -11 * density), paint);
+
+        paint.setColor(0xFFB87870);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(1.2f * density);
-        canvas.drawLine(x - radius, centerY, x + radius, centerY, paint);
+        paint.setStrokeWidth(0.8f * density);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        canvas.drawArc(new RectF(28.5f * density, -10 * density, 31 * density, -7.5f * density),
+                10, 150, false, paint);
+        canvas.drawArc(new RectF(32 * density, -10 * density, 34.5f * density, -7.5f * density),
+                10, 150, false, paint);
         paint.setStyle(Paint.Style.FILL);
+
+        paint.setColor(0xFFF2A1A8);
+        canvas.drawCircle(27.5f * density, -8 * density, 1.2f * density, paint);
+        canvas.drawCircle(35 * density, -8 * density, 1.2f * density, paint);
+        canvas.restore();
+
+        paint.setColor(0xFF8EC6D8);
+        paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD));
+        paint.setTextSize(7 * density);
+        canvas.drawText("Z", 38 * density, -16 * density, paint);
+        paint.setTextSize(5 * density);
+        canvas.drawText("Z", 43 * density, -22 * density, paint);
+        canvas.restore();
     }
 
     private void drawSunsetIcon(Canvas canvas, float x, float centerY, float radius, float density) {
