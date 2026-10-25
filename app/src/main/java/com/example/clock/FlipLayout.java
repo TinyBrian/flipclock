@@ -11,7 +11,6 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.View;
@@ -37,7 +36,6 @@ public class FlipLayout extends FrameLayout  {
     private int layoutWidth;
     private int layoutHeight;
     private Scroller mScroller;
-    private String TAG = "FlipLayout";
     private String timetag;//根据时间标记获取时间
     private Camera mCamera = new Camera();
     private Matrix mMatrix = new Matrix();
@@ -278,16 +276,13 @@ public class FlipLayout extends FrameLayout  {
     /**绘制翻页时的阳面和阴面*/
     private void drawFlippingShademinutene(Canvas canvas) {
         final float degreesFlipped = getDeg();
-        Log.d(TAG,"deg: " + degreesFlipped);
         if (degreesFlipped < 90) {
             final int alpha = getAlpha(degreesFlipped);
-            Log.d(TAG,"小于90度时的透明度-------------------> " + alpha);
             mminutenePaint.setAlpha(alpha);
             mShadePaint.setAlpha(alpha);
             canvas.drawRect(isUp ? mBottomRect : mTopRect, isUp ? mminutenePaint : mShadePaint);
         } else {
             final int alpha = getAlpha(Math.abs(degreesFlipped - 180));
-            Log.d(TAG,"大于90度时的透明度-------------> " + alpha);
             mShadePaint.setAlpha(alpha);
             mminutenePaint.setAlpha(alpha);
             canvas.drawRect(isUp ? mTopRect : mBottomRect, isUp ? mShadePaint : mminutenePaint);

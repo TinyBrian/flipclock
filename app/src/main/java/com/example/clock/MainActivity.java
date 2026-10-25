@@ -7,6 +7,8 @@ import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.os.BatteryManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
@@ -18,8 +20,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.Calendar;
 import java.util.Locale;
-import java.util.Timer;
-import java.util.TimerTask;
 /**
  * Created by mulan on 21/1/21.
  */
@@ -32,6 +32,15 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
     private BatteryIconView batteryIconView;
     private TextView batteryPercentageTextView;
     private boolean batteryReceiverRegistered;
+    private final Handler clockHandler = new Handler(Looper.getMainLooper());
+    private final Runnable clockTick = new Runnable() {
+        @Override
+        public void run() {
+            start();
+            updateDateInfo();
+            scheduleNextClockTick();
+        }
+    };
     private final BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(android.content.Context context, Intent intent) {
@@ -54,6 +63,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
         batteryIconView = findViewById(R.id.battery_icon);
         batteryPercentageTextView = findViewById(R.id.battery_percentage);
 
+        oldNumber = Calendar.getInstance();
         bit_hour.flip(oldNumber.get(Calendar.HOUR_OF_DAY),24,TimeTAG.hour);
         bit_minute.flip( oldNumber.get(Calendar.MINUTE),60,TimeTAG.min);
         bit_second.flip(oldNumber.get(Calendar.SECOND),60,TimeTAG.sec);
@@ -63,21 +73,29 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
         updateBatteryLevel(registerReceiver(batteryReceiver, batteryFilter));
         batteryReceiverRegistered = true;
 
-        new Timer().schedule(new TimerTask() {
-            @Override
-            public void run() {
-                start();
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        updateDateInfo();
-                    }
-                });
-            }
-        }, 1000, 1000);//每一秒执行一次
 //        bit_hour.addFlipOverListener(this);
 //        bit_minute.addFlipOverListener(this);
 //        bit_second.addFlipOverListener(this);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        start();
+        updateDateInfo();
+        scheduleNextClockTick();
+    }
+
+    @Override
+    protected void onPause() {
+        clockHandler.removeCallbacks(clockTick);
+        super.onPause();
+    }
+
+    private void scheduleNextClockTick() {
+        clockHandler.removeCallbacks(clockTick);
+        long delay = 1000 - (System.currentTimeMillis() % 1000);
+        clockHandler.postDelayed(clockTick, delay);
     }
 
     private void updateBatteryLevel(Intent batteryStatus) {
@@ -214,24 +232,19 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
 
         oldNumber = now;
 
-        int hour = nhour - ohour;
-        int minute = nminute - ominute;
-        int second = nsecond- osecond;
-
-       
-        if (hour >= 1||hour==-23) {
+        if (nhour != ohour) {
             bit_hour.smoothFlip(1, 24,TimeTAG.hour,false);
 
         }
 
-        if (minute >=1||minute==-59) {
+        if (nminute != ominute) {
             bit_minute.smoothFlip(1, 60,TimeTAG.min,false);
 
         }
 
-        if (second >=1||second==-59) {
+        if (nsecond != osecond) {
             bit_second.smoothFlip(1, 60,TimeTAG.sec,false);
-        }//当下一秒变为0时减去上一秒是-59
+        }
 
 
 
