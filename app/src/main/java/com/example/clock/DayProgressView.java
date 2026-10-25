@@ -12,6 +12,7 @@ import android.view.View;
 import android.os.SystemClock;
 
 import java.util.Locale;
+import java.util.Random;
 
 public class DayProgressView extends View {
 
@@ -23,8 +24,11 @@ public class DayProgressView extends View {
     private int sunriseMinute = 6 * 60;
     private int sunsetMinute = 18 * 60;
     private int style = STYLE_CLASSIC;
+    private float treeScale = 2f;
+    private final long treeLayoutSeed = new Random().nextLong();
     private static final float TURTLE_SCALE = 3f;
     private static final int TURTLE_LEG_SWING_INTERVAL_MS = 1000;
+    private static final int MAX_TREE_COUNT = 14;
 
     public DayProgressView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -52,6 +56,14 @@ public class DayProgressView extends View {
         invalidate();
     }
 
+    public void setTreeScale(float scale) {
+        if (Float.isNaN(scale) || Float.isInfinite(scale) || scale <= 0) {
+            throw new IllegalArgumentException("Tree scale must be a finite positive number");
+        }
+        treeScale = scale;
+        invalidate();
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
@@ -68,6 +80,8 @@ public class DayProgressView extends View {
         float sunriseX = positionForTime(startX, endX, sunriseMinute);
         float sunsetX = positionForTime(startX, endX, sunsetMinute);
         int themeColor = getResources().getColor(R.color.sky_blue);
+
+        drawTrees(canvas, startX, endX, trackY, density, sunriseX, sunsetX);
 
         paint.setColor(0xFF283747);
         canvas.drawRoundRect(startX, trackY, endX, trackY + trackHeight,
@@ -92,6 +106,56 @@ public class DayProgressView extends View {
         if (isShown()) {
             postInvalidateDelayed(TURTLE_LEG_SWING_INTERVAL_MS);
         }
+    }
+
+    private void drawTrees(Canvas canvas, float startX, float endX, float baseY, float density,
+                           float sunriseX, float sunsetX) {
+        float spacing = 46 * density;
+        int candidateCount = Math.max(0, (int) ((endX - startX) / spacing));
+        int treeCountLimit = Math.min(candidateCount, MAX_TREE_COUNT);
+        Random random = new Random(treeLayoutSeed);
+        int[] greens = {0xFF2E7D32, 0xFF388E3C, 0xFF336B3B, 0xFF427A3D};
+
+        for (int i = 0; i < treeCountLimit; i++) {
+            float x = startX + spacing * (i + 0.5f) + (random.nextFloat() - 0.5f) * spacing * 0.45f;
+            if (random.nextFloat() > 0.62f
+                    || (sunriseX >= 0 && Math.abs(x - sunriseX) < 88 * density)
+                    || (sunsetX >= 0 && Math.abs(x - sunsetX) < 24 * density)) {
+                continue;
+            }
+
+            int tiers = 1 + random.nextInt(3);
+            float tierHeight = (6 + random.nextFloat()) * density * treeScale;
+            int green = greens[random.nextInt(greens.length)];
+            drawPineTree(canvas, x, baseY, tierHeight, tiers, green, density);
+        }
+    }
+
+    private void drawPineTree(Canvas canvas, float centerX, float baseY, float tierHeight,
+                              int tiers, int green, float density) {
+        float treeHeight = tierHeight * tiers;
+        float trunkWidth = 2 * density * treeScale;
+        float trunkHeight = Math.min(3 * density * treeScale, treeHeight * 0.2f);
+        float foliageBaseY = baseY - trunkHeight;
+
+        paint.setColor(green);
+        for (int tier = 0; tier < tiers; tier++) {
+            float topY = foliageBaseY - treeHeight + tier * tierHeight;
+            float bottomY = topY + tierHeight;
+            float angle = (30 + tier * 20) * (float) Math.PI / 180f;
+            float halfBase = tierHeight * (float) Math.tan(angle / 2f);
+
+            Path foliage = new Path();
+            foliage.moveTo(centerX, topY);
+            foliage.lineTo(centerX + halfBase, bottomY);
+            foliage.lineTo(centerX - halfBase, bottomY);
+            foliage.close();
+            canvas.drawPath(foliage, paint);
+        }
+
+        paint.setColor(0xFF8D5A35);
+        canvas.drawRect(centerX - trunkWidth / 2f, foliageBaseY,
+                centerX + trunkWidth / 2f, baseY + 2 * density, paint);
     }
 
     private void drawSunMarker(Canvas canvas, float x, float trackY, float density, boolean sunrise) {
