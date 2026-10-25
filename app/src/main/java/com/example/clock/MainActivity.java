@@ -47,6 +47,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
 
     private static final int LOCATION_PERMISSION_REQUEST = 1001;
     private static final String TAG = "MainActivity";
+    private static final long WEATHER_REFRESH_INTERVAL = 30 * 60 * 1000L;
     private TextView dateInfoTextView;
     private FlipLayout bit_hour;
     private FlipLayout bit_minute;
@@ -62,6 +63,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
     private final Runnable locationTimeout = () -> {
         if (locationListener != null) {
             stopLocationUpdates();
+        }
+    };
+    private final Runnable weatherRefresh = new Runnable() {
+        @Override
+        public void run() {
+            requestWeatherLocation();
+            clockHandler.postDelayed(this, WEATHER_REFRESH_INTERVAL);
         }
     };
     private int weatherRequestId;
@@ -127,13 +135,20 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
         updateDateInfo();
         scheduleNextClockTick();
         requestWeatherLocation();
+        scheduleWeatherRefresh();
     }
 
     @Override
     protected void onPause() {
         clockHandler.removeCallbacks(clockTick);
+        clockHandler.removeCallbacks(weatherRefresh);
         stopLocationUpdates();
         super.onPause();
+    }
+
+    private void scheduleWeatherRefresh() {
+        clockHandler.removeCallbacks(weatherRefresh);
+        clockHandler.postDelayed(weatherRefresh, WEATHER_REFRESH_INTERVAL);
     }
 
     private void requestWeatherLocation() {
