@@ -12,24 +12,53 @@
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:minHeight="72dp">
 
         <TextView
             android:id="@+id/date_info_text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_gravity="center"
             android:gravity="center"
-            android:paddingTop="18dp"
-            android:paddingBottom="8dp"
             android:textColor="@color/sky_blue"
             android:textSize="20sp"
             android:textStyle="bold"
             android:text="2024年01月01日 农历正月初一 星期一" />
 
         <LinearLayout
+            android:id="@+id/weather_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingEnd="12dp">
+
+            <com.example.clock.WeatherIconView
+                android:id="@+id/weather_icon"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:contentDescription="今日天气图标" />
+
+            <TextView
+                android:id="@+id/weather_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:fontFamily="monospace"
+                android:gravity="center_vertical"
+                android:textColor="@color/sky_blue"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:minWidth="64dp"
+                android:contentDescription="气温" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/battery_status"
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_gravity="start|center_vertical"
             android:gravity="center_vertical"
             android:orientation="horizontal"
