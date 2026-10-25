@@ -36,7 +36,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.format.TextStyle;
 import java.util.Calendar;
 import java.util.Locale;
@@ -332,6 +334,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
                         weatherInfoTextView.setTextColor(weatherIconView.getTemperatureColor());
                         weatherInfoTextView.setText(String.format(Locale.CHINA,
                                 "%.0f°C", weather.temperature));
+                        dayProgressView.setSunTimes(weather.sunriseMinute, weather.sunsetMinute);
                     }
                 });
             } catch (IOException | JSONException e) {
@@ -347,7 +350,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
 
     private WeatherData loadWeather(Location location) throws IOException, JSONException {
         String address = String.format(Locale.US,
-                "https://api.open-meteo.com/v1/forecast?latitude=%.5f&longitude=%.5f&current=temperature_2m,weather_code,is_day&timezone=auto",
+                "https://api.open-meteo.com/v1/forecast?latitude=%.5f&longitude=%.5f&current=temperature_2m,weather_code,is_day&daily=sunrise,sunset&forecast_days=1&timezone=auto",
                 location.getLatitude(), location.getLongitude());
         HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
         connection.setConnectTimeout(10000);
@@ -365,12 +368,29 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
                 while ((line = reader.readLine()) != null) {
                     response.append(line);
                 }
-                JSONObject current = new JSONObject(response.toString()).getJSONObject("current");
+                JSONObject weatherResponse = new JSONObject(response.toString());
+                JSONObject current = weatherResponse.getJSONObject("current");
+                JSONObject daily = weatherResponse.getJSONObject("daily");
                 return new WeatherData(current.getDouble("temperature_2m"), current.getInt("weather_code"),
-                        current.getInt("is_day") == 1);
+                        current.getInt("is_day") == 1,
+                        parseMinutesSinceMidnight(daily.getJSONArray("sunrise").getString(0)),
+                        parseMinutesSinceMidnight(daily.getJSONArray("sunset").getString(0)));
             }
         } finally {
             connection.disconnect();
+        }
+    }
+
+    private int parseMinutesSinceMidnight(String dateTime) throws JSONException {
+        int timeStart = dateTime.indexOf('T') + 1;
+        if (timeStart == 0 || dateTime.length() < timeStart + 5) {
+            throw new JSONException("Invalid sunrise or sunset time: " + dateTime);
+        }
+        try {
+            LocalTime time = LocalTime.parse(dateTime.substring(timeStart, timeStart + 5));
+            return time.getHour() * 60 + time.getMinute();
+        } catch (DateTimeParseException e) {
+            throw new JSONException("Invalid sunrise or sunset time: " + dateTime);
         }
     }
 
@@ -414,11 +434,15 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
         final double temperature;
         final int weatherCode;
         final boolean isDay;
+        final int sunriseMinute;
+        final int sunsetMinute;
 
-        WeatherData(double temperature, int weatherCode, boolean isDay) {
+        WeatherData(double temperature, int weatherCode, boolean isDay, int sunriseMinute, int sunsetMinute) {
             this.temperature = temperature;
             this.weatherCode = weatherCode;
             this.isDay = isDay;
+            this.sunriseMinute = sunriseMinute;
+            this.sunsetMinute = sunsetMinute;
         }
     }
 

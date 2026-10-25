@@ -2,9 +2,11 @@ package com.example.clock;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.util.AttributeSet;
 import android.view.View;
 import android.os.SystemClock;
@@ -18,6 +20,8 @@ public class DayProgressView extends View {
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private float progress;
+    private int sunriseMinute = 6 * 60;
+    private int sunsetMinute = 18 * 60;
     private int style = STYLE_CLASSIC;
     private static final float TURTLE_SCALE = 3f;
     private static final int TURTLE_LEG_SWING_INTERVAL_MS = 1000;
@@ -28,8 +32,16 @@ public class DayProgressView extends View {
 
     public void setProgress(float progress) {
         this.progress = Math.max(0f, Math.min(1f, progress));
-        setContentDescription(String.format(Locale.CHINA, "今日时间进度 %.1f%%", this.progress * 100));
+        setContentDescription(String.format(Locale.CHINA,
+                "今日时间进度 %.1f%%，日出 %s，日落 %s", this.progress * 100,
+                formatTime(sunriseMinute), formatTime(sunsetMinute)));
         invalidate();
+    }
+
+    public void setSunTimes(int sunriseMinute, int sunsetMinute) {
+        this.sunriseMinute = normalizeSunTime(sunriseMinute);
+        this.sunsetMinute = normalizeSunTime(sunsetMinute);
+        setProgress(progress);
     }
 
     public void setStyle(int style) {
@@ -47,12 +59,14 @@ public class DayProgressView extends View {
         float density = getResources().getDisplayMetrics().density;
         float width = getWidth();
         float height = getHeight();
-        float inset = (style == STYLE_ARROW ? 10 : 8) * density;
+        float inset = 18 * density;
         float trackHeight = (style == STYLE_ARROW ? 4 : 2) * density;
         float trackY = height - 5 * density - trackHeight / 2f;
         float startX = inset;
-        float endX = Math.max(startX, width - (style == STYLE_ARROW ? 6 : 8) * density);
+        float endX = Math.max(startX, width - inset);
         float progressX = startX + (endX - startX) * progress;
+        float sunriseX = positionForTime(startX, endX, sunriseMinute);
+        float sunsetX = positionForTime(startX, endX, sunsetMinute);
         int themeColor = getResources().getColor(R.color.sky_blue);
 
         paint.setColor(0xFF283747);
@@ -64,6 +78,12 @@ public class DayProgressView extends View {
         canvas.drawRoundRect(startX, trackY, fillEndX, trackY + trackHeight,
                 density, density, paint);
 
+        if (sunriseX >= 0) {
+            drawSunMarker(canvas, sunriseX, trackY, density, true);
+        }
+        if (sunsetX >= 0) {
+            drawSunMarker(canvas, sunsetX, trackY, density, false);
+        }
         if (style == STYLE_ARROW) {
             drawArrowHead(canvas, Math.min(endX, progressX + 5 * density), trackY + trackHeight / 2f,
                     3 * density, themeColor);
@@ -72,6 +92,82 @@ public class DayProgressView extends View {
         if (isShown()) {
             postInvalidateDelayed(TURTLE_LEG_SWING_INTERVAL_MS);
         }
+    }
+
+    private void drawSunMarker(Canvas canvas, float x, float trackY, float density, boolean sunrise) {
+        float radius = 10 * density;
+        float centerY = sunrise ? trackY : trackY - 12 * density;
+
+        if (sunrise) {
+            drawSunriseIcon(canvas, x, centerY, radius, density);
+        } else {
+            drawSunsetIcon(canvas, x, centerY, radius, density);
+        }
+    }
+
+    private void drawSunriseIcon(Canvas canvas, float x, float centerY, float radius, float density) {
+        paint.setColor(0xFFFFD54F);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(1.5f * density);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        int[] rayAngles = {-150, -135, -120, -105, -90, -75, -60, -45, -30};
+        float[] rayLengths = {2f, 2.8f, 3.6f, 4.4f, 5.2f, 4.4f, 3.6f, 2.8f, 2f};
+        for (int i = 0; i < rayAngles.length; i++) {
+            double radians = Math.toRadians(rayAngles[i]);
+            float rayStartRadius = radius + 2 * density;
+            float rayEndRadius = rayStartRadius + rayLengths[i] * density;
+            float innerX = x + (float) Math.cos(radians) * rayStartRadius;
+            float innerY = centerY + (float) Math.sin(radians) * rayStartRadius;
+            float outerX = x + (float) Math.cos(radians) * rayEndRadius;
+            float outerY = centerY + (float) Math.sin(radians) * rayEndRadius;
+            canvas.drawLine(innerX, innerY, outerX, outerY, paint);
+        }
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setShader(new LinearGradient(x, centerY - radius, x, centerY + radius,
+                0xFFFFF5A5, 0xFFEF5350, Shader.TileMode.CLAMP));
+        canvas.save();
+        canvas.clipRect(x - radius, centerY - radius, x + radius, centerY);
+        canvas.drawCircle(x, centerY, radius, paint);
+        canvas.restore();
+        paint.setShader(null);
+
+        paint.setColor(0xFFFFD54F);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(1.2f * density);
+        canvas.drawLine(x - radius, centerY, x + radius, centerY, paint);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
+    private void drawSunsetIcon(Canvas canvas, float x, float centerY, float radius, float density) {
+        paint.setShader(new LinearGradient(x, centerY - radius, x, centerY + radius,
+                0xFFFFB6A5, 0xFFE53950, Shader.TileMode.CLAMP));
+        canvas.drawCircle(x, centerY, radius, paint);
+        paint.setShader(null);
+
+        Path farHill = new Path();
+        farHill.moveTo(x - 1.15f * radius, centerY + 0.15f * radius);
+        farHill.lineTo(x - 0.35f * radius, centerY - 0.3f * radius);
+        farHill.lineTo(x + 0.05f * radius, centerY + 0.05f * radius);
+        farHill.lineTo(x + 0.45f * radius, centerY - 0.2f * radius);
+        farHill.lineTo(x + 1.15f * radius, centerY + 0.25f * radius);
+        farHill.lineTo(x + 1.15f * radius, centerY + radius);
+        farHill.lineTo(x - 1.15f * radius, centerY + radius);
+        farHill.close();
+        paint.setColor(0xFF81C784);
+        canvas.drawPath(farHill, paint);
+
+        Path nearHill = new Path();
+        nearHill.moveTo(x - 1.15f * radius, centerY + 0.55f * radius);
+        nearHill.lineTo(x - 0.35f * radius, centerY + 0.1f * radius);
+        nearHill.lineTo(x + 0.15f * radius, centerY + 0.55f * radius);
+        nearHill.lineTo(x + 0.55f * radius, centerY + 0.25f * radius);
+        nearHill.lineTo(x + 1.15f * radius, centerY + 0.65f * radius);
+        nearHill.lineTo(x + 1.15f * radius, centerY + radius);
+        nearHill.lineTo(x - 1.15f * radius, centerY + radius);
+        nearHill.close();
+        paint.setColor(0xFF2E7D32);
+        canvas.drawPath(nearHill, paint);
     }
 
     private void drawArrowHead(Canvas canvas, float tipX, float centerY, float size, int color) {
@@ -139,5 +235,20 @@ public class DayProgressView extends View {
         }
         paint.setStyle(Paint.Style.FILL);
         canvas.restore();
+    }
+
+    private float positionForTime(float startX, float endX, int minute) {
+        if (minute < 0) {
+            return -1;
+        }
+        return startX + (endX - startX) * minute / (24f * 60);
+    }
+
+    private int normalizeSunTime(int minute) {
+        return minute >= 0 && minute < 24 * 60 ? minute : -1;
+    }
+
+    private String formatTime(int minute) {
+        return minute < 0 ? "未知" : String.format(Locale.CHINA, "%02d:%02d", minute / 60, minute % 60);
     }
 }
