@@ -1,0 +1,229 @@
+#!/system/bin/sh
+
+PKG="com.example.clock"
+
+# 电池充电状态：用于触发 App 检查
+BATTERY_STATUS="/sys/class/power_supply/battery/status"
+
+# USB 外部供电状态：仅用于断电关机
+PORT_NODE="/sys/class/power_supply/pc_port/online"
+
+LOG="/data/adb/usb-control.log"
+
+log() {
+    echo "$(date '+%F %T') $*" >> "$LOG"
+}
+
+get_battery_status() {
+    cat "$BATTERY_STATUS" 2>/dev/null | tr -d '\r'
+}
+
+get_power_state() {
+    if [ ! -r "$PORT_NODE" ]; then
+        echo "unknown"
+        return
+    fi
+
+    STATE="$(cat "$PORT_NODE" 2>/dev/null | tr -d '\r')"
+
+    case "$STATE" in
+        1) echo "1" ;;
+        0) echo "0" ;;
+        *) echo "unknown" ;;
+    esac
+}
+
+# 获取当前前台 App 的包名
+get_foreground_pkg() {
+    LINE="$(dumpsys activity activities 2>/dev/null \
+        | grep -m 1 'topResumedActivity')"
+
+    if [ -z "$LINE" ]; then
+        LINE="$(dumpsys activity activities 2>/dev/null \
+            | grep -m 1 'mResumedActivity')"
+    fi
+
+    if [ -z "$LINE" ]; then
+        LINE="$(dumpsys activity activities 2>/dev/null \
+            | grep -m 1 'ResumedActivity')"
+    fi
+
+    if [ -z "$LINE" ]; then
+        LINE="$(dumpsys window windows 2>/dev/null \
+            | grep -m 1 'mCurrentFocus')"
+    fi
+
+    printf '%s\n' "$LINE" \
+        | sed -n 's/.* u[0-9][0-9]* \([^/ ]*\)\/.*/\1/p' \
+        | head -n 1
+}
+
+# 只在电池进入 Charging 状态时执行一次
+handle_charge_started() {
+    log "Battery entered Charging; checking foreground App"
+
+    if ! pm path "$PKG" >/dev/null 2>&1; then
+        log "ERROR: target package not installed: $PKG"
+        return
+    fi
+
+    FG="$(get_foreground_pkg)"
+
+    if [ "$FG" = "$PKG" ]; then
+        log "Target already foreground; no action"
+        return
+    fi
+
+    log "Foreground=$FG; launching $PKG"
+
+    monkey -p "$PKG" \
+        -c android.intent.category.LAUNCHER 1 >> "$LOG" 2>&1
+
+    sleep 2
+
+    FG2="$(get_foreground_pkg)"
+    log "After launch: foreground=$FG2"
+
+    if [ "$FG2" != "$PKG" ]; then
+        log "WARN: target App did not become foreground"
+    fi
+}
+
+# 断电 60 秒后关机
+request_shutdown() {
+    log "External power absent for 60 seconds; shutting down"
+
+    sync
+    sleep 1
+
+    /system/bin/reboot -p
+    RC=$?
+
+    # 如果关机命令返回，再尝试备用请求
+    log "WARN: reboot -p returned rc=$RC; trying sys.powerctl"
+
+    setprop sys.powerctl shutdown,usb_power_lost
+
+    sleep 10
+    log "WARN: shutdown request returned; monitoring continues"
+}
+
+# 等待 Android 启动完成
+while [ "$(getprop sys.boot_completed)" != "1" ]; do
+    sleep 2
+done
+
+sleep 5
+
+if [ ! -r "$PORT_NODE" ]; then
+    log "ERROR: USB power node unavailable"
+    exit 1
+fi
+
+if [ ! -r "$BATTERY_STATUS" ]; then
+    log "ERROR: battery status node unavailable"
+    exit 1
+fi
+
+# Charging 状态边沿检测
+# 0 = 上一次不是 Charging
+# 1 = 已经处理过本次 Charging 状态
+CHARGE_ACTIVE=0
+LAST_BATTERY_STATUS=""
+
+# 断电监控状态
+PREV_PORT=0
+SEEN_POWER=0
+OFFLINE_SECONDS=0
+
+log "Battery charging monitor and shutdown monitor started"
+
+while true; do
+
+    # ==========================================
+    # 第一部分：监测电池状态，只在进入 Charging 时触发
+    # ==========================================
+
+    BAT_STATE="$(get_battery_status)"
+
+    if [ "$BAT_STATE" != "$LAST_BATTERY_STATUS" ]; then
+        log "Battery status=$BAT_STATE"
+        LAST_BATTERY_STATUS="$BAT_STATE"
+    fi
+
+    case "$BAT_STATE" in
+        Charging)
+            if [ "$CHARGE_ACTIVE" -eq 0 ]; then
+                # 消抖：确认状态仍然是 Charging
+                sleep 1
+                CONFIRM_BAT="$(get_battery_status)"
+
+                if [ "$CONFIRM_BAT" = "Charging" ]; then
+                    CHARGE_ACTIVE=1
+                    handle_charge_started
+                fi
+            fi
+            ;;
+
+        Full|Discharging|"Not charging")
+            # 离开 Charging 状态。
+            # 下次重新进入 Charging 时允许再次触发。
+            CHARGE_ACTIVE=0
+            ;;
+
+        *)
+            # Unknown 或读取失败时不触发，也不改变原状态
+            ;;
+    esac
+
+    # ==========================================
+    # 第二部分：监测外部供电，只负责断电关机
+    # 不再从这里启动 App
+    # ==========================================
+
+    POWER_STATE="$(get_power_state)"
+
+    case "$POWER_STATE" in
+        1)
+            if [ "$PREV_PORT" != "1" ]; then
+                log "External power online"
+            fi
+
+            PREV_PORT=1
+            SEEN_POWER=1
+            OFFLINE_SECONDS=0
+            ;;
+
+        0)
+            if [ "$PREV_PORT" = "1" ]; then
+                log "External power lost; shutdown countdown started"
+            fi
+
+            PREV_PORT=0
+
+            if [ "$SEEN_POWER" -eq 1 ]; then
+                OFFLINE_SECONDS=$((OFFLINE_SECONDS + 2))
+
+                if [ "$OFFLINE_SECONDS" -ge 60 ]; then
+                    # 关机前再确认一次
+                    STATE2="$(get_power_state)"
+
+                    if [ "$STATE2" = "0" ]; then
+                        OFFLINE_SECONDS=0
+                        request_shutdown
+                    else
+                        OFFLINE_SECONDS=0
+                        log "Power restored; shutdown cancelled"
+                    fi
+                fi
+            fi
+            ;;
+
+        *)
+            # 无法确认供电状态时，不累计断电时间
+            OFFLINE_SECONDS=0
+            ;;
+    esac
+
+    sleep 2
+done
