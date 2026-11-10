@@ -20,6 +20,8 @@ public class DayProgressView extends View {
     public static final int STYLE_ARROW = 1;
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final RectF trackRect = new RectF();
+    private final RectF fillRect = new RectF();
     private float progress;
     private int sunriseMinute = 6 * 60;
     private int sunsetMinute = 18 * 60;
@@ -84,13 +86,13 @@ public class DayProgressView extends View {
         drawTrees(canvas, startX, endX, trackY, density, sunriseX, sunsetX);
 
         paint.setColor(0xFF283747);
-        canvas.drawRoundRect(startX, trackY, endX, trackY + trackHeight,
-                density, density, paint);
+        trackRect.set(startX, trackY, endX, trackY + trackHeight);
+        canvas.drawRoundRect(trackRect, density, density, paint);
 
         paint.setColor(themeColor);
         float fillEndX = style == STYLE_ARROW ? Math.max(startX, progressX - 8 * density) : progressX;
-        canvas.drawRoundRect(startX, trackY, fillEndX, trackY + trackHeight,
-                density, density, paint);
+        fillRect.set(startX, trackY, fillEndX, trackY + trackHeight);
+        canvas.drawRoundRect(fillRect, density, density, paint);
 
         if (sunriseX >= 0) {
             drawSunMarker(canvas, sunriseX, trackY, density, true);

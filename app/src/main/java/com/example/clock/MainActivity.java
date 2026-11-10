@@ -1,13 +1,14 @@
 package com.example.clock;
 
-import android.app.Activity;
 import android.Manifest;
+import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.PackageManager;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -23,7 +24,10 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
 
-import android.icu.util.ChineseCalendar;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
+import com.ibm.icu.util.ChineseCalendar;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -35,12 +39,9 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.time.format.TextStyle;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -51,6 +52,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
 
     private static final int LOCATION_PERMISSION_REQUEST = 1001;
     private static final String TAG = "MainActivity";
+    private static final String RENDERING_PREFERENCES = "rendering";
+    private static final String KEY_SESSION_ACTIVE = "session_active";
+    private static final String KEY_FORCE_SOFTWARE = "force_software";
     private static final long WEATHER_REFRESH_INTERVAL = 30 * 60 * 1000L;
     private TextView dateInfoTextView;
     private FlipLayout bit_hour;
@@ -111,7 +115,32 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
     protected void onCreate(Bundle savedInstanceState) {
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         super.onCreate(savedInstanceState);
+        SharedPreferences renderingPreferences =
+                getSharedPreferences(RENDERING_PREFERENCES, Context.MODE_PRIVATE);
+        boolean forceSoftware = renderingPreferences.getBoolean(KEY_FORCE_SOFTWARE, false);
+        if (renderingPreferences.getBoolean(KEY_SESSION_ACTIVE, false) && !forceSoftware) {
+            boolean persisted = renderingPreferences.edit()
+                    .putBoolean(KEY_FORCE_SOFTWARE, true)
+                    .putBoolean(KEY_SESSION_ACTIVE, false)
+                    .commit();
+            forceSoftware = true;
+            if (!persisted) {
+                Log.e(TAG, "Unable to persist software-rendering fallback");
+            }
+            Log.w(TAG, "Previous session exited unexpectedly; switching to software rendering");
+        }
+        if (forceSoftware && getClass() == MainActivity.class) {
+            Log.i(TAG, "Opening software-rendering fallback activity");
+            startActivity(new Intent(this, SoftwareRenderingActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION));
+            finish();
+            return;
+        }
         setContentView(R.layout.activity_main);
+        boolean hardwareAccelerationRequested =
+                (getWindow().getAttributes().flags & WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED) != 0;
+        Log.i(TAG, "Renderer: " + getClass().getSimpleName() + ", hardware acceleration requested="
+                + hardwareAccelerationRequested);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
@@ -188,6 +217,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
     @Override
     protected void onResume() {
         super.onResume();
+        getSharedPreferences(RENDERING_PREFERENCES, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_SESSION_ACTIVE, true)
+                .commit();
         activityResumed = true;
         pendingAnnouncementHour = -1;
         oldNumber = Calendar.getInstance();
@@ -206,6 +239,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
 
     @Override
     protected void onPause() {
+        getSharedPreferences(RENDERING_PREFERENCES, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_SESSION_ACTIVE, false)
+                .commit();
         activityResumed = false;
         pendingAnnouncementHour = -1;
         if (textToSpeech != null) {
@@ -231,11 +268,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
     }
 
     private void requestWeatherLocation() {
-        if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
-                && checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
             if (!locationPermissionRequested) {
                 locationPermissionRequested = true;
-                requestPermissions(new String[] {
+                ActivityCompat.requestPermissions(this, new String[] {
                         Manifest.permission.ACCESS_COARSE_LOCATION,
                         Manifest.permission.ACCESS_FINE_LOCATION
                 }, LOCATION_PERMISSION_REQUEST);
@@ -387,9 +426,14 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
             throw new JSONException("Invalid sunrise or sunset time: " + dateTime);
         }
         try {
-            LocalTime time = LocalTime.parse(dateTime.substring(timeStart, timeStart + 5));
-            return time.getHour() * 60 + time.getMinute();
-        } catch (DateTimeParseException e) {
+            int hour = Integer.parseInt(dateTime.substring(timeStart, timeStart + 2));
+            int minute = Integer.parseInt(dateTime.substring(timeStart + 3, timeStart + 5));
+            if (dateTime.charAt(timeStart + 2) != ':' || hour < 0 || hour > 23
+                    || minute < 0 || minute > 59) {
+                throw new NumberFormatException("Invalid time");
+            }
+            return hour * 60 + minute;
+        } catch (NumberFormatException e) {
             throw new JSONException("Invalid sunrise or sunset time: " + dateTime);
         }
     }
@@ -473,20 +517,19 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
     }
 
     private void updateDateInfo() {
-        LocalDate today = LocalDate.now();
-        String dateText = today.format(DateTimeFormatter.ofPattern("yyyy年MM月dd日", Locale.CHINA));
+        Calendar today = Calendar.getInstance(Locale.CHINA);
+        String dateText = new SimpleDateFormat("yyyy年MM月dd日", Locale.CHINA).format(today.getTime());
 
-        java.util.Calendar utilCalendar = java.util.Calendar.getInstance(Locale.CHINA);
-        utilCalendar.setTimeInMillis(System.currentTimeMillis());
         ChineseCalendar chineseCalendar = new ChineseCalendar(Locale.CHINA);
-        chineseCalendar.setTimeInMillis(utilCalendar.getTimeInMillis());
+        chineseCalendar.setTimeInMillis(today.getTimeInMillis());
 
         int lunarMonth = chineseCalendar.get(ChineseCalendar.MONTH) + 1;
         int lunarDay = chineseCalendar.get(ChineseCalendar.DAY_OF_MONTH);
         boolean isLeapMonth = chineseCalendar.get(ChineseCalendar.IS_LEAP_MONTH) == 1;
         String lunarText = "农历" + formatLunarMonth(lunarMonth, isLeapMonth) + formatLunarDay(lunarDay);
 
-        String weekText = today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.CHINA);
+        String[] weekdays = {"", "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"};
+        String weekText = weekdays[today.get(Calendar.DAY_OF_WEEK)];
         dateInfoTextView.setText(dateText + " " + lunarText + " " + weekText);
     }
 
@@ -621,8 +664,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
         }
 
         String announcement = String.format(Locale.SIMPLIFIED_CHINESE, "现在是%d点整", hour);
-        int result = textToSpeech.speak(announcement, TextToSpeech.QUEUE_FLUSH, null,
+        HashMap<String, String> speechParams = new HashMap<>();
+        speechParams.put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID,
                 "hour-" + System.currentTimeMillis());
+        int result = textToSpeech.speak(announcement, TextToSpeech.QUEUE_FLUSH, speechParams);
         if (result == TextToSpeech.ERROR) {
             Log.e(TAG, "Unable to speak hourly announcement");
         }

@@ -20,6 +20,9 @@
         android:roundIcon="@mipmap/icon_time"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+        <activity android:name=".SoftwareRenderingActivity"
+            android:hardwareAccelerated="false"
+            android:exported="false" />
         <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
