@@ -56,6 +56,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
     private static final String KEY_SESSION_ACTIVE = "session_active";
     private static final String KEY_FORCE_SOFTWARE = "force_software";
     private static final long WEATHER_REFRESH_INTERVAL = 30 * 60 * 1000L;
+    private static final long WEATHER_RETRY_INTERVAL = 5 * 60 * 1000L;
     private TextView dateInfoTextView;
     private FlipLayout bit_hour;
     private FlipLayout bit_minute;
@@ -76,8 +77,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
     private final Runnable locationTimeout = () -> {
         if (locationListener != null) {
             stopLocationUpdates();
+            scheduleWeatherRetry("Location request timed out");
         }
     };
+    private final Runnable weatherRetry = this::requestWeatherLocation;
     private final Runnable weatherRefresh = new Runnable() {
         @Override
         public void run() {
@@ -251,6 +254,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
         clockHandler.removeCallbacks(clockTick);
         clockHandler.removeCallbacks(dayProgressTick);
         clockHandler.removeCallbacks(weatherRefresh);
+        clockHandler.removeCallbacks(weatherRetry);
         stopLocationUpdates();
         super.onPause();
     }
@@ -258,6 +262,15 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
     private void scheduleWeatherRefresh() {
         clockHandler.removeCallbacks(weatherRefresh);
         clockHandler.postDelayed(weatherRefresh, WEATHER_REFRESH_INTERVAL);
+    }
+
+    private void scheduleWeatherRetry(String reason) {
+        if (!activityResumed) {
+            return;
+        }
+        Log.i(TAG, reason + "; retrying weather in 5 minutes");
+        clockHandler.removeCallbacks(weatherRetry);
+        clockHandler.postDelayed(weatherRetry, WEATHER_RETRY_INTERVAL);
     }
 
     private void updateDayProgress() {
@@ -332,6 +345,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
             }
             if (requested) {
                 clockHandler.postDelayed(locationTimeout, 20000);
+            } else {
+                stopLocationUpdates();
+                scheduleWeatherRetry("No location provider available");
             }
         } catch (SecurityException e) {
             stopLocationUpdates();
@@ -374,13 +390,14 @@ public class MainActivity extends Activity implements View.OnClickListener, Flip
                         weatherInfoTextView.setText(String.format(Locale.CHINA,
                                 "%.0f°C", weather.temperature));
                         dayProgressView.setSunTimes(weather.sunriseMinute, weather.sunsetMinute);
+                        clockHandler.removeCallbacks(weatherRetry);
                     }
                 });
             } catch (IOException | JSONException e) {
                 Log.e(TAG, "Unable to load current weather", e);
                 runOnUiThread(() -> {
                     if (requestId == weatherRequestId && !isFinishing()) {
-                        weatherInfoTextView.setText("");
+                        scheduleWeatherRetry("Weather request failed");
                     }
                 });
             }
